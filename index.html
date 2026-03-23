@@ -725,7 +725,7 @@ var IMGCACHE = {};
 
 // ─── PRODUCT DATABASE ─────────────────────────────────────────
 var PRODUCTS_DB = {};
-fetch('https://goya-importaciones.github.io/ggoya-marcaje/index-netlify/products_db_github.json')
+fetch('https://goya-importaciones.github.io/ggoya-marcaje/products_db_github.json')
   .then(function(r){ return r.json(); })
   .then(function(data){ 
     PRODUCTS_DB = data; 
