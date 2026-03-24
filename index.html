@@ -3010,7 +3010,45 @@ async function genPDF(){
       console.warn('Imagen real no disponible, usando snapshot:', err);
     }
   }
+// ── Logo SVG vectorial en el PDF ──────────────────────────────
+  if(LOGO && typeof svg2pdf === 'function'){
+    try{
+      // Exportar logo como SVG desde Fabric
+      var svgStr = LOGO.toSVG();
+      var svgEl = document.createElement('div');
+      svgEl.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;';
+      svgEl.innerHTML = svgStr;
+      document.body.appendChild(svgEl);
+      var svgNode = svgEl.querySelector('svg');
 
+      if(svgNode){
+        // Calcular posición del logo en mm usando la misma escala que el producto
+        var logoL = getObjLeft(LOGO);
+        var logoT = getObjTop(LOGO);
+        var logoW = LOGO.getScaledWidth();
+        var logoH = LOGO.getScaledHeight();
+
+        // Convertir de pixels del canvas a mm en el PDF
+        // usando la proporción producto canvas → producto PDF
+        var canvasToMM = drawWmm / prodPxW;
+        var logoXmm = centreX + (logoL - getObjLeft(PROD)) * canvasToMM;
+        var logoYmm = imgTopY + (logoT - getObjTop(PROD)) * canvasToMM;
+        var logoWmm_pdf = logoW * canvasToMM;
+        var logoHmm_pdf = logoH * canvasToMM;
+
+        await svg2pdf(svgNode, pdf, {
+          x: logoXmm,
+          y: logoYmm,
+          width: logoWmm_pdf,
+          height: logoHmm_pdf
+        });
+        toast('✓ Logo SVG vectorial añadido','ok');
+      }
+      document.body.removeChild(svgEl);
+    } catch(err){
+      console.warn('svg2pdf logo error:', err);
+    }
+  }
   // Fallback: snapshot del canvas
   if(!imageLoaded){
     try{
