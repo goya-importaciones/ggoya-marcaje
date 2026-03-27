@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774606605353,
+      "nombreCarpeta": "45-1235",
+      "tecnica": "SUBLIMACION",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T10:16:45.353Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\SUBLIMACION\\45-1235",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774605302298,
       "nombreCarpeta": "45-1235",
       "tecnica": "SERIGRAFIA",
