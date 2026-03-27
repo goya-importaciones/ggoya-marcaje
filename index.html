@@ -3448,7 +3448,7 @@ function tarjetaPedido(p, leidos, esHecho) {
 
   var tickBtn = esHecho
     ? '<span style="font-size:9px;color:#4caf50;font-weight:700;letter-spacing:.5px;">✓ HECHO</span>'
-    : '<button onclick="marcarHecho('+p.id+')" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor='#4caf50';this.style.color='#4caf50'" onmouseout="this.style.borderColor='#2e2e3a';this.style.color='#3a3a4a'">Hecho</button>';
+    : '<button onclick="event.stopPropagation(); marcarHecho('+p.id+')" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor=\'#4caf50\';this.style.color=\'#4caf50\'" onmouseout="this.style.borderColor=\'#2e2e3a\';this.style.color=\'#3a3a4a\'">Hecho</button>';
 
   return '<div style="padding:10px 10px 8px;border-bottom:1px solid #22222e;">'
     + '<div style="display:flex;align-items:center;margin-bottom:5px;">'
@@ -3502,10 +3502,7 @@ function toggleBell() {
   var panel = document.getElementById('bell-panel');
   if (panel.style.display === 'none' || panel.style.display === '') {
     panel.style.display = 'block';
-    fetch(PEDIDOS_URL, {headers:{'Accept':'application/vnd.github.raw+json','Cache-Control':'no-cache'}})
-      .then(function(r){ return r.json(); })
-      .then(function(data){ renderBell(data.pedidos || []); })
-      .catch(function(){});
+    cargarPedidos();
   } else {
     panel.style.display = 'none';
   }
@@ -3520,22 +3517,20 @@ document.addEventListener('click', function(e) {
 });
 
 function cargarPedidos() {
-  fetch(PEDIDOS_URL, {headers:{'Accept':'application/vnd.github.raw+json','Cache-Control':'no-cache'}})
+  var urlConTiempoReal = PEDIDOS_URL + '?t=' + Date.now();
+  fetch(urlConTiempoReal)
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var pedidos  = data.pedidos || [];
-      var leidos   = getPedidosLeidos();
-      var ocultos  = getPedidosOcultos();
-      var hechos   = getPedidosHechos();
-      var visibles = pedidos.filter(function(p){ return !ocultos.includes(p.id); });
-      var nuevos   = visibles.filter(function(p){ return !leidos.includes(p.id) && !hechos.includes(p.id); });
       _pedidosCache = pedidos;
-      var count = document.getElementById('bell-count');
-      count.style.display = nuevos.length > 0 ? 'block' : 'none';
-      count.textContent   = nuevos.length > 99 ? '99+' : String(nuevos.length);
+      renderBell(pedidos);
     })
-    .catch(function(){});
+    .catch(function(err){ console.error("Error cargando pedidos:", err); });
 }
+
+window.bellTab = bellTab;
+window.toggleBell = toggleBell;
+window.marcarHecho = marcarHecho;
 
 cargarPedidos();
 setInterval(cargarPedidos, 30000);
