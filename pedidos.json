@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774611253028,
+      "nombreCarpeta": "457-7777",
+      "tecnica": "TAMPOGRAFIA",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T11:34:13.028Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\TAMPOGRAFIA\\457-7777",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774611223426,
       "nombreCarpeta": "457-7777",
       "tecnica": "TAMPOGRAFIA",
