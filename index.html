@@ -1388,6 +1388,7 @@ function autoC(){
       target.set({
         left: prodCX, top: prodCY,
         originX:'center', originY:'center'
+
       });
       target.setCoords();
     }
@@ -3448,7 +3449,7 @@ function tarjetaPedido(p, leidos, esHecho) {
 
   var tickBtn = esHecho
     ? '<span style="font-size:9px;color:#4caf50;font-weight:700;letter-spacing:.5px;">✓ HECHO</span>'
-    : '<button onclick="marcarHecho('+p.id+')" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor=\'#4caf50\';this.style.color=\'#4caf50\'" onmouseout="this.style.borderColor=\'#2e2e3a\';this.style.color=\'#3a3a4a\'">Hecho</button>';
+    : '<button onclick="marcarHecho('+p.id+')" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor='#4caf50';this.style.color='#4caf50'" onmouseout="this.style.borderColor='#2e2e3a';this.style.color='#3a3a4a'">Hecho</button>';
 
   return '<div style="padding:10px 10px 8px;border-bottom:1px solid #22222e;">'
     + '<div style="display:flex;align-items:center;margin-bottom:5px;">'
@@ -3519,22 +3520,31 @@ document.addEventListener('click', function(e) {
   }
 });
 
-function cargarPedidos() {
-  fetch(PEDIDOS_URL, {headers:{'Accept':'application/vnd.github.raw+json','Cache-Control':'no-cache'}})
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      var pedidos  = data.pedidos || [];
-      var leidos   = getPedidosLeidos();
-      var ocultos  = getPedidosOcultos();
-      var hechos   = getPedidosHechos();
-      var visibles = pedidos.filter(function(p){ return !ocultos.includes(p.id); });
-      var nuevos   = visibles.filter(function(p){ return !leidos.includes(p.id) && !hechos.includes(p.id); });
-      _pedidosCache = pedidos;
-      var count = document.getElementById('bell-count');
-      count.style.display = nuevos.length > 0 ? 'block' : 'none';
-      count.textContent   = nuevos.length > 99 ? '99+' : String(nuevos.length);
-    })
-    .catch(function(){});
+async function cargarPedidos() {
+  // Añadimos un parámetro aleatorio al final (?t=...) para saltar la caché de GitHub 
+  // sin enviar la cabecera 'cache-control' que causa el error de CORS.
+  const url = 'https://api.github.com/repos/Goya-importaciones/ggoya-marcaje/contents/pedidos.json?t=' + new Date( ).getTime();
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/vnd.github.v3.raw'
+        // IMPORTANTE: Aquí NO debe haber nada de 'cache-control' ni 'pragma'
+      }
+      // NO pongas nada de 'cache: no-store' aquí si ves que sigue fallando, 
+      // el ?t= ya se encarga de que sea tiempo real.
+    });
+
+    if (!response.ok) throw new Error('Error en la respuesta de GitHub');
+    
+    const data = await response.json();
+    _pedidosCache = data; // O la variable donde guardes los pedidos
+    renderBell(_pedidosCache);
+    
+  } catch (error) {
+    console.error("Error cargando pedidos:", error);
+  }
 }
 
 cargarPedidos();
