@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774611066171,
+      "nombreCarpeta": "1987-1297",
+      "tecnica": "LASER MADERA",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T11:31:06.171Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\LASER MADERA\\1987-1297",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774610997102,
       "nombreCarpeta": "7458-1111",
       "tecnica": "DTG",
