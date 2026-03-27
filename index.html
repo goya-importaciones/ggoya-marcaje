@@ -457,7 +457,7 @@ body{background:var(--bg);font-family:'Barlow',sans-serif;color:var(--txt);
   </div>
   <div class="sep"></div>
   <!-- ── CAMPANITA DE PEDIDOS ── -->
- <div id="bell-wrap" style="position:relative;flex-shrink:0;">
+  <div id="bell-wrap" style="position:relative;flex-shrink:0;">
     <button class="btn ic" id="bell-btn" onclick="toggleBell()" title="Pedidos nuevos" style="position:relative;width:32px;">
       <svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto;"><path d="M8 2C8 2 4.5 3.5 4.5 8.5v4H3v1.2h10V12.5H11.5v-4C11.5 3.5 8 2 8 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.2 13.7C6.2 14.88 7 15.7 8 15.7s1.8-.82 1.8-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="1.5" r="1" fill="currentColor"/></svg>
       <span id="bell-count" style="
@@ -3373,7 +3373,7 @@ function applyLang(lang){
 </script>
 <script>
 // ── CAMPANITA DE PEDIDOS ─────────────────────────────────────────
-const PEDIDOS_URL = 'https://raw.githubusercontent.com/Goya-importaciones/ggoya-marcaje/main/pedidos.json';
+const PEDIDOS_URL = 'https://api.github.com/repos/Goya-importaciones/ggoya-marcaje/contents/pedidos.json';
 const LEIDOS_KEY  = 'pedidos_leidos';
 const OCULTOS_KEY = 'pedidos_ocultos';
 let _pedidosCache = [];
@@ -3411,99 +3411,134 @@ function limpiarLista() {
   renderBell(_pedidosCache);
 }
 
+var _bellTab = 'nuevos';
+var HECHOS_KEY = 'pedidos_hechos';
+function getPedidosHechos() { return JSON.parse(localStorage.getItem(HECHOS_KEY) || '[]'); }
+function setPedidosHechos(ids) { localStorage.setItem(HECHOS_KEY, JSON.stringify(ids)); }
+
+function bellTab(tab) {
+  _bellTab = tab;
+  var tN = document.getElementById('tab-nuevos');
+  var tH = document.getElementById('tab-hechos');
+  if (tab === 'nuevos') {
+    tN.style.color = '#c8a96e'; tN.style.borderBottom = '2px solid #c8a96e';
+    tH.style.color = '#3a3a4a'; tH.style.borderBottom = '2px solid transparent';
+  } else {
+    tH.style.color = '#c8a96e'; tH.style.borderBottom = '2px solid #c8a96e';
+    tN.style.color = '#3a3a4a'; tN.style.borderBottom = '2px solid transparent';
+  }
+  renderBell(_pedidosCache);
+}
+
+function marcarHecho(id) {
+  var hechos = getPedidosHechos();
+  if (!hechos.includes(id)) { hechos.push(id); setPedidosHechos(hechos); }
+  renderBell(_pedidosCache);
+}
+
+function tarjetaPedido(p, leidos, esHecho) {
+  var esNuevo = !leidos.includes(p.id) && !esHecho;
+  var fecha = new Date(p.fecha).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  var email = (p.email || '').replace(/.*<(.+)>.*/, '$1').trim() || (p.email || '').trim() || '—';
+  var asunto = p.asunto || '—';
+  var rutaEsc = (p.ruta || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  var dotColor = esHecho ? '#4caf50' : esNuevo ? '#c8a96e' : '#3a3a4a';
+  var nameColor = esHecho ? '#4a6050' : esNuevo ? '#e8e4dc' : '#5a5a6a';
+  var tecColor  = esHecho ? '#3a5040' : '#5a5a6a';
+
+  var tickBtn = esHecho
+    ? '<span style="font-size:9px;color:#4caf50;font-weight:700;letter-spacing:.5px;">✓ HECHO</span>'
+    : '<button onclick="marcarHecho('+p.id+')" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor=\'#4caf50\';this.style.color=\'#4caf50\'" onmouseout="this.style.borderColor=\'#2e2e3a\';this.style.color=\'#3a3a4a\'">Hecho</button>';
+
+  return '<div style="padding:10px 10px 8px;border-bottom:1px solid #22222e;">'
+    + '<div style="display:flex;align-items:center;margin-bottom:5px;">'
+    + '<span style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';display:inline-block;margin-right:7px;flex-shrink:0;"></span>'
+    + '<span style="font-weight:700;font-size:12px;color:'+nameColor+';flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+( p.nombreCarpeta || '—')+'</span>'
+    + '<span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:'+tecColor+';margin-left:8px;flex-shrink:0;">'+(p.tecnica || '—')+'</span>'
+    + '</div>'
+    + '<div style="font-size:10px;color:#4a4a5a;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+email+'</div>'
+    + '<div style="font-size:10px;color:#3a3a4a;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+asunto+'">'+(asunto.length > 45 ? asunto.substring(0,45)+'…' : asunto)+'</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+    + '<span style="font-size:9px;color:#2e2e3a;font-family:\'Share Tech Mono\',monospace;">'+fecha+'</span>'
+    + '<div style="display:flex;gap:6px;align-items:center;">'
+    + tickBtn
+    + '<button onclick="copiarRuta(\''+rutaEsc+'\', this)" style="padding:3px 8px;border-radius:2px;border:1px solid #2e2e3a;background:transparent;color:#3a3a4a;cursor:pointer;font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;font-family:Barlow,sans-serif;transition:all .15s;" onmouseover="this.style.borderColor=\'#c8a96e\';this.style.color=\'#c8a96e\'" onmouseout="this.style.borderColor=\'#2e2e3a\';this.style.color=\'#3a3a4a\'">Ruta</button>'
+    + '</div></div></div>';
+}
+
 function renderBell(pedidos) {
   _pedidosCache = pedidos;
-  const leidos  = getPedidosLeidos();
-  const ocultos = getPedidosOcultos();
-  const visibles = pedidos.filter(p => !ocultos.includes(p.id));
-  const nuevos   = visibles.filter(p => !leidos.includes(p.id));
+  var leidos  = getPedidosLeidos();
+  var ocultos = getPedidosOcultos();
+  var hechos  = getPedidosHechos();
+  var visibles = pedidos.filter(function(p){ return !ocultos.includes(p.id); });
+  var nuevos   = visibles.filter(function(p){ return !leidos.includes(p.id) && !hechos.includes(p.id); });
 
-  const count = document.getElementById('bell-count');
-  const list  = document.getElementById('bell-list');
+  var count = document.getElementById('bell-count');
+  var list  = document.getElementById('bell-list');
 
   count.style.display = nuevos.length > 0 ? 'block' : 'none';
-  count.textContent   = nuevos.length > 99 ? '99+' : nuevos.length;
+  count.textContent   = nuevos.length > 99 ? '99+' : String(nuevos.length);
 
-  if (visibles.length === 0) {
-    list.innerHTML = '<div style="padding:20px;text-align:center;color:#6a6070;font-size:12px;">No hay pedidos</div>';
+  if (_bellTab === 'hechos') {
+    var hechosItems = visibles.filter(function(p){ return hechos.includes(p.id); });
+    if (hechosItems.length === 0) {
+      list.innerHTML = '<div style="padding:24px;text-align:center;color:#2e2e3a;font-size:10px;letter-spacing:1px;text-transform:uppercase;">Sin hechos</div>';
+    } else {
+      list.innerHTML = hechosItems.map(function(p){ return tarjetaPedido(p, leidos, true); }).join('');
+    }
     return;
   }
 
-  list.innerHTML = visibles.map(p => {
-    const esNuevo = !leidos.includes(p.id);
-    const fecha   = new Date(p.fecha).toLocaleString('es-ES');
-    const emailCorto = (p.email || '—').replace(/<.*?>/, '').trim();
-    const asunto  = p.asunto || '—';
-    const bgColor = esNuevo ? 'rgba(200,169,110,.12)' : 'rgba(255,255,255,.03)';
-    const border  = esNuevo ? '#c8a96e55' : '#3a3a48';
-    const rutaEsc = (p.ruta || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-    return `
-      <div style="padding:10px 12px;margin-bottom:6px;border-radius:4px;background:${bgColor};border:1px solid ${border};">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-          <span style="font-weight:700;font-size:13px;color:${esNuevo ? '#c8a96e' : '#e8e4dc'};">
-            ${esNuevo ? '🆕 ' : ''}${p.nombreCarpeta || '—'}
-          </span>
-          <span style="font-size:10px;background:#363642;padding:2px 6px;border-radius:3px;color:#a09888;">${p.tecnica || '—'}</span>
-        </div>
-        <div style="font-size:11px;color:#a09888;margin-bottom:2px;">📧 ${emailCorto}</div>
-        <div style="font-size:10px;color:#6a6070;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${asunto}">
-          ${asunto.length > 50 ? asunto.substring(0, 50) + '...' : asunto}
-        </div>
-        <div style="font-size:10px;color:#6a6070;margin-bottom:8px;">🕐 ${fecha}</div>
-        <button onclick="copiarRuta('${rutaEsc}', this)" style="
-          width:100%;padding:6px;border-radius:3px;border:1px solid #c8a96e55;
-          background:rgba(200,169,110,.1);color:#c8a96e;cursor:pointer;
-          font-size:10px;font-weight:600;letter-spacing:.5px;font-family:Barlow,sans-serif;
-        ">📋 Copiar ruta de carpeta</button>
-      </div>`;
-  }).join('');
-
-  // Marcar como leídos al renderizar
-  const leidosActualizados = [...new Set([...leidos, ...visibles.map(p => p.id)])];
-  setPedidosLeidos(leidosActualizados);
-  count.style.display = 'none';
+  var pendientes = visibles.filter(function(p){ return !hechos.includes(p.id); });
+  if (pendientes.length === 0) {
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:#2e2e3a;font-size:10px;letter-spacing:1px;text-transform:uppercase;">Sin pedidos</div>';
+    return;
+  }
+  list.innerHTML = pendientes.map(function(p){ return tarjetaPedido(p, leidos, false); }).join('');
 }
 
 function toggleBell() {
-  const panel = document.getElementById('bell-panel');
-  if (panel.style.display === 'none') {
+  var panel = document.getElementById('bell-panel');
+  if (panel.style.display === 'none' || panel.style.display === '') {
     panel.style.display = 'block';
-    fetch(PEDIDOS_URL + '?t=' + Date.now())
-      .then(r => r.json())
-      .then(data => renderBell(data.pedidos || []))
-      .catch(() => {});
+    fetch(PEDIDOS_URL, {headers:{'Accept':'application/vnd.github.raw+json','Cache-Control':'no-cache'}})
+      .then(function(r){ return r.json(); })
+      .then(function(data){ renderBell(data.pedidos || []); })
+      .catch(function(){});
   } else {
     panel.style.display = 'none';
   }
 }
 
 document.addEventListener('click', function(e) {
-  const wrap = document.getElementById('bell-wrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('bell-panel').style.display = 'none';
+  var panel = document.getElementById('bell-panel');
+  var wrap  = document.getElementById('bell-wrap');
+  if (panel && wrap && !wrap.contains(e.target) && !panel.contains(e.target)) {
+    panel.style.display = 'none';
   }
 });
 
 function cargarPedidos() {
-  fetch(PEDIDOS_URL + '?t=' + Date.now())
-    .then(r => r.json())
-    .then(data => {
-      const pedidos  = data.pedidos || [];
-      const leidos   = getPedidosLeidos();
-      const ocultos  = getPedidosOcultos();
-      const visibles = pedidos.filter(p => !ocultos.includes(p.id));
-      const nuevos   = visibles.filter(p => !leidos.includes(p.id));
-      _pedidosCache  = pedidos;
-      const count    = document.getElementById('bell-count');
+  fetch(PEDIDOS_URL, {headers:{'Accept':'application/vnd.github.raw+json','Cache-Control':'no-cache'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var pedidos  = data.pedidos || [];
+      var leidos   = getPedidosLeidos();
+      var ocultos  = getPedidosOcultos();
+      var hechos   = getPedidosHechos();
+      var visibles = pedidos.filter(function(p){ return !ocultos.includes(p.id); });
+      var nuevos   = visibles.filter(function(p){ return !leidos.includes(p.id) && !hechos.includes(p.id); });
+      _pedidosCache = pedidos;
+      var count = document.getElementById('bell-count');
       count.style.display = nuevos.length > 0 ? 'block' : 'none';
-      count.textContent   = nuevos.length > 99 ? '99+' : nuevos.length;
+      count.textContent   = nuevos.length > 99 ? '99+' : String(nuevos.length);
     })
-    .catch(() => {});
+    .catch(function(){});
 }
 
 cargarPedidos();
-setInterval(cargarPedidos, 60000);
+setInterval(cargarPedidos, 30000);
 </script>
 </body>
 </html>
