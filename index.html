@@ -3521,7 +3521,8 @@ function cargarPedidos() {
   fetch(urlConTiempoReal)
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      var pedidos  = data.pedidos || [];
+      // Soporta tanto si el JSON es una lista directa [] como si viene en {pedidos: []}
+      var pedidos = Array.isArray(data) ? data : (data.pedidos || []);
       _pedidosCache = pedidos;
       renderBell(pedidos);
     })
