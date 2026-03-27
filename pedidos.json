@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774619836878,
+      "nombreCarpeta": "4575-1111",
+      "tecnica": "LASER",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T13:57:16.878Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\LASER\\4575-1111",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774618745301,
       "nombreCarpeta": "3333-4444",
       "tecnica": "VINILO",
