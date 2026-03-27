@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774611223426,
+      "nombreCarpeta": "457-7777",
+      "tecnica": "TAMPOGRAFIA",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T11:33:43.426Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\TAMPOGRAFIA\\457-7777",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774611066171,
       "nombreCarpeta": "1987-1297",
       "tecnica": "LASER MADERA",
