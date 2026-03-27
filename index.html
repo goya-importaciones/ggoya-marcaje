@@ -3441,7 +3441,13 @@ function tarjetaPedido(p, leidos, esHecho) {
   var fecha = new Date(p.fecha).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   var email = (p.email || '').replace(/.*<(.+)>.*/, '$1').trim() || (p.email || '').trim() || '—';
   var asunto = p.asunto || '—';
-  var rutaEsc = (p.ruta || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  // Forzamos que la ruta empiece por las dos barras de red de Windows
+var rutaOriginal = (p.ruta || '');
+if (rutaOriginal.startsWith('\\') && !rutaOriginal.startsWith('\\\\')) {
+    rutaOriginal = '\\' + rutaOriginal;
+}
+var rutaEsc = rutaOriginal.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
   var dotColor = esHecho ? '#4caf50' : esNuevo ? '#c8a96e' : '#3a3a4a';
   var nameColor = esHecho ? '#4a6050' : esNuevo ? '#e8e4dc' : '#5a5a6a';
   var tecColor  = esHecho ? '#3a5040' : '#5a5a6a';
