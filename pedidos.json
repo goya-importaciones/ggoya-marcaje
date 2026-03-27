@@ -1,3 +1,13 @@
 {
-  "pedidos": []
+  "pedidos": [
+    {
+      "id": 1774604618211,
+      "nombreCarpeta": "45-1235",
+      "tecnica": "SERIGRAFIA",
+      "anio": "2027",
+      "fecha": "2026-03-27T09:43:38.211Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\SERIGRAFIA\\45-1235",
+      "estado": "nuevo"
+    }
+  ]
 }
