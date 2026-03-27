@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774618745301,
+      "nombreCarpeta": "3333-4444",
+      "tecnica": "VINILO",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T13:39:05.301Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\VINILO\\3333-4444",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774616742683,
       "nombreCarpeta": "3555-4445",
       "tecnica": "BORDADO",
