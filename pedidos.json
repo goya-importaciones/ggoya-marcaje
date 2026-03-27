@@ -1,6 +1,17 @@
 {
   "pedidos": [
     {
+      "id": 1774616742683,
+      "nombreCarpeta": "3555-4445",
+      "tecnica": "BORDADO",
+      "anio": "2027",
+      "email": "",
+      "asunto": "",
+      "fecha": "2026-03-27T13:05:42.683Z",
+      "ruta": "\\\\S1Goya.GGOYA.local\\Datos Nuevo\\Goya\\Comercial\\TALLERES\\BOCETOS\\2027\\BORDADO\\3555-4445",
+      "estado": "nuevo"
+    },
+    {
       "id": 1774614770206,
       "nombreCarpeta": "4444-5555",
       "tecnica": "BORDADO",
