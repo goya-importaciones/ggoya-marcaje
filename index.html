@@ -458,8 +458,8 @@ body{background:var(--bg);font-family:'Barlow',sans-serif;color:var(--txt);
   <div class="sep"></div>
   <!-- ── CAMPANITA DE PEDIDOS ── -->
   <div id="bell-wrap" style="position:relative;flex-shrink:0;">
-    <button class="btn ic" id="bell-btn" onclick="toggleBell()" title="Pedidos nuevos" style="font-size:16px;position:relative;">
-      🔔
+    <button class="btn ic" id="bell-btn" onclick="toggleBell()" title="Pedidos nuevos" style="position:relative;">
+      ◈
       <span id="bell-count" style="
         display:none;position:absolute;top:-4px;right:-4px;
         background:#e53935;color:#fff;border-radius:50%;
@@ -467,18 +467,18 @@ body{background:var(--bg);font-family:'Barlow',sans-serif;color:var(--txt);
         line-height:16px;text-align:center;pointer-events:none;
       ">0</span>
     </button>
-    <div id="bell-panel" style="
-      display:none;position:absolute;top:38px;right:0;
-      width:360px;max-height:480px;overflow-y:auto;
-      background:#22222a;border:1px solid #3a3a48;border-radius:6px;
-      box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:9999;
-    ">
-      <div style="padding:10px 14px;border-bottom:1px solid #3a3a48;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#22222a;">
-        <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a09888;">Pedidos Nuevos</span>
-        <button onclick="limpiarLista()" style="font-size:10px;color:#e53935;background:none;border:none;cursor:pointer;font-weight:600;">🗑 Limpiar lista</button>
-      </div>
-      <div id="bell-list" style="padding:8px;"></div>
+  </div>
+  <div id="bell-panel" style="
+    display:none;position:fixed;top:46px;right:12px;
+    width:340px;max-height:500px;overflow-y:auto;
+    background:#1e1e26;border:1px solid #3a3a48;border-radius:5px;
+    box-shadow:0 12px 40px rgba(0,0,0,.7);z-index:9999;
+  ">
+    <div style="padding:10px 14px;border-bottom:1px solid #3a3a48;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#1e1e26;">
+      <span style="font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;">Pedidos</span>
+      <button onclick="limpiarLista()" style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6a6070;background:none;border:none;cursor:pointer;transition:color .15s;" onmouseover="this.style.color='#e53935'" onmouseout="this.style.color='#6a6070'">Limpiar</button>
     </div>
+    <div id="bell-list" style="padding:6px;"></div>
   </div>
 </div>
 
@@ -751,7 +751,7 @@ var IMGCACHE = {};
 
 // ─── PRODUCT DATABASE ─────────────────────────────────────────
 var PRODUCTS_DB = {};
-fetch('https://goya-importaciones.github.io/ggoya-marcaje/products_db_github.json')
+fetch('https://goya-importaciones.github.io/ggoya-marcaje/index-netlify/products_db_github.json')
   .then(function(r){ return r.json(); })
   .then(function(data){ 
     PRODUCTS_DB = data; 
@@ -3420,44 +3420,37 @@ function renderBell(pedidos) {
   count.textContent   = nuevos.length > 99 ? '99+' : nuevos.length;
 
   if (visibles.length === 0) {
-    list.innerHTML = '<div style="padding:20px;text-align:center;color:#6a6070;font-size:12px;">No hay pedidos</div>';
+    list.innerHTML = '<div style="padding:24px;text-align:center;color:#3a3a48;font-size:11px;letter-spacing:1px;text-transform:uppercase;">Sin pedidos</div>';
     return;
   }
 
   list.innerHTML = visibles.map(p => {
     const esNuevo = !leidos.includes(p.id);
-    const fecha   = new Date(p.fecha).toLocaleString('es-ES');
-    const emailCorto = (p.email || '—').replace(/<.*?>/, '').trim();
+    const fecha   = new Date(p.fecha).toLocaleString('es-ES', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const emailCorto = (p.email || '').replace(/<.*?>/, '').replace(/.*<|>.*/g,'').trim() || '—';
     const asunto  = p.asunto || '—';
-    const bgColor = esNuevo ? 'rgba(200,169,110,.12)' : 'rgba(255,255,255,.03)';
-    const border  = esNuevo ? '#c8a96e55' : '#3a3a48';
     const rutaEsc = (p.ruta || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const dot     = esNuevo ? '<span style="width:6px;height:6px;border-radius:50%;background:#c8a96e;display:inline-block;margin-right:6px;flex-shrink:0;"></span>' : '<span style="width:6px;height:6px;border-radius:50%;background:#3a3a48;display:inline-block;margin-right:6px;flex-shrink:0;"></span>';
 
-    return `
-      <div style="padding:10px 12px;margin-bottom:6px;border-radius:4px;background:${bgColor};border:1px solid ${border};">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-          <span style="font-weight:700;font-size:13px;color:${esNuevo ? '#c8a96e' : '#e8e4dc'};">
-            ${esNuevo ? '🆕 ' : ''}${p.nombreCarpeta || '—'}
-          </span>
-          <span style="font-size:10px;background:#363642;padding:2px 6px;border-radius:3px;color:#a09888;">${p.tecnica || '—'}</span>
-        </div>
-        <div style="font-size:11px;color:#a09888;margin-bottom:2px;">📧 ${emailCorto}</div>
-        <div style="font-size:10px;color:#6a6070;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${asunto}">
-          ${asunto.length > 50 ? asunto.substring(0, 50) + '...' : asunto}
-        </div>
-        <div style="font-size:10px;color:#6a6070;margin-bottom:8px;">🕐 ${fecha}</div>
+    return `<div style="padding:10px 10px 8px;margin-bottom:4px;border-radius:3px;background:${esNuevo ? 'rgba(200,169,110,.07)' : 'transparent'};border-bottom:1px solid #2a2a32;">
+      <div style="display:flex;align-items:center;margin-bottom:6px;">
+        ${dot}
+        <span style="font-weight:700;font-size:12px;color:${esNuevo ? '#e8e4dc' : '#6a6070'};flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.nombreCarpeta || '—'}</span>
+        <span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#4a4a58;margin-left:8px;flex-shrink:0;">${p.tecnica || '—'}</span>
+      </div>
+      <div style="font-size:10px;color:#4a4a58;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${emailCorto}</div>
+      <div style="font-size:10px;color:#3a3a48;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${asunto}">${asunto.length > 45 ? asunto.substring(0,45)+'…' : asunto}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:9px;color:#3a3a48;font-family:'Share Tech Mono',monospace;">${fecha}</span>
         <button onclick="copiarRuta('${rutaEsc}', this)" style="
-          width:100%;padding:6px;border-radius:3px;border:1px solid #c8a96e55;
-          background:rgba(200,169,110,.1);color:#c8a96e;cursor:pointer;
-          font-size:10px;font-weight:600;letter-spacing:.5px;font-family:Barlow,sans-serif;
-        ">📋 Copiar ruta de carpeta</button>
-      </div>`;
+          padding:3px 10px;border-radius:2px;border:1px solid #3a3a48;
+          background:transparent;color:#6a6070;cursor:pointer;
+          font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+          font-family:Barlow,sans-serif;transition:all .15s;
+        " onmouseover="this.style.borderColor='#c8a96e';this.style.color='#c8a96e'" onmouseout="this.style.borderColor='#3a3a48';this.style.color='#6a6070'">Copiar ruta</button>
+      </div>
+    </div>`;
   }).join('');
-
-  // Marcar como leídos al renderizar
-  const leidosActualizados = [...new Set([...leidos, ...visibles.map(p => p.id)])];
-  setPedidosLeidos(leidosActualizados);
-  count.style.display = 'none';
 }
 
 function toggleBell() {
@@ -3474,9 +3467,10 @@ function toggleBell() {
 }
 
 document.addEventListener('click', function(e) {
-  const wrap = document.getElementById('bell-wrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('bell-panel').style.display = 'none';
+  const panel = document.getElementById('bell-panel');
+  const wrap  = document.getElementById('bell-wrap');
+  if (panel && wrap && !wrap.contains(e.target) && !panel.contains(e.target)) {
+    panel.style.display = 'none';
   }
 });
 
