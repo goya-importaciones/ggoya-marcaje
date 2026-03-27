@@ -7,7 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.4.0/dist/svg2pdf.umd.min.js"></script><style>
+<script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.4.0/dist/svg2pdf.umd.min.js"></script>
+<style>
 /* ── VARIABLES ──────────────────────────────────────────────── */
 :root{
   --gold:#c8a96e; --gold-d:#8b7355; --gold-dd:#6d5a3f;
@@ -454,6 +455,31 @@ body{background:var(--bg);font-family:'Barlow',sans-serif;color:var(--txt);
       <option value="pt">PT</option>
     </select>
   </div>
+  <div class="sep"></div>
+  <!-- ── CAMPANITA DE PEDIDOS ── -->
+  <div id="bell-wrap" style="position:relative;flex-shrink:0;">
+    <button class="btn ic" id="bell-btn" onclick="toggleBell()" title="Pedidos nuevos" style="font-size:16px;position:relative;">
+      🔔
+      <span id="bell-count" style="
+        display:none;position:absolute;top:-4px;right:-4px;
+        background:#e53935;color:#fff;border-radius:50%;
+        width:16px;height:16px;font-size:9px;font-weight:700;
+        line-height:16px;text-align:center;pointer-events:none;
+      ">0</span>
+    </button>
+    <div id="bell-panel" style="
+      display:none;position:absolute;top:38px;right:0;
+      width:360px;max-height:480px;overflow-y:auto;
+      background:#22222a;border:1px solid #3a3a48;border-radius:6px;
+      box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:9999;
+    ">
+      <div style="padding:10px 14px;border-bottom:1px solid #3a3a48;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#22222a;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a09888;">Pedidos Nuevos</span>
+        <button onclick="limpiarLista()" style="font-size:10px;color:#e53935;background:none;border:none;cursor:pointer;font-weight:600;">🗑 Limpiar lista</button>
+      </div>
+      <div id="bell-list" style="padding:8px;"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════════════ WORKSPACE ══════════════════════ -->
@@ -725,7 +751,7 @@ var IMGCACHE = {};
 
 // ─── PRODUCT DATABASE ─────────────────────────────────────────
 var PRODUCTS_DB = {};
-fetch('https://goya-importaciones.github.io/ggoya-marcaje/products_db_github.json')
+fetch('https://goya-importaciones.github.io/ggoya-marcaje/index-netlify/products_db_github.json')
   .then(function(r){ return r.json(); })
   .then(function(data){ 
     PRODUCTS_DB = data; 
@@ -3005,13 +3031,12 @@ async function genPDF(){
       pdf.setFillColor(255,255,255);
       pdf.rect(centreX, imgTopY, drawWmm, drawHmm, 'F');
       pdf.addImage(b64, 'JPEG', centreX, imgTopY, drawWmm, drawHmm);
-   imageLoaded = true;
-      // ── Logo SVG vectorial ──
-      await addLogoSVGtoPDF(pdf, centreX, imgTopY, drawWmm, prodPxW);
+      imageLoaded = true;
     } catch(err){
       console.warn('Imagen real no disponible, usando snapshot:', err);
     }
   }
+
   // Fallback: snapshot del canvas
   if(!imageLoaded){
     try{
@@ -3141,28 +3166,7 @@ async function genPDF(){
   pdf.save(slug(rE?rE.textContent:'boceto')+'_'+slug(pE?pE.textContent:'prod')+'_'+slug(cE?cE.textContent:'cli')+'.pdf');
   toast('✓ PDF guardado','ok');
 }
-async function addLogoSVGtoPDF(pdf, centreX, imgTopY, drawWmm, prodPxW){
-  if(!LOGO || !svg2pdf || !svg2pdf.svg2pdf) return;
-  try{
-    var svgStr = LOGO.toSVG();
-    var svgEl = document.createElement('div');
-    svgEl.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;';
-    svgEl.innerHTML = svgStr;
-    document.body.appendChild(svgEl);
-    var svgNode = svgEl.querySelector('svg');
-    if(svgNode){
-      var canvasToMM = drawWmm / prodPxW;
-      var logoXmm = centreX + (getObjLeft(LOGO) - getObjLeft(PROD)) * canvasToMM;
-      var logoYmm = imgTopY + (getObjTop(LOGO) - getObjTop(PROD)) * canvasToMM;
-      var logoWmm_pdf = LOGO.getScaledWidth() * canvasToMM;
-      var logoHmm_pdf = LOGO.getScaledHeight() * canvasToMM;
-      await svg2pdf.svg2pdf(svgNode, pdf, {x:logoXmm, y:logoYmm, width:logoWmm_pdf, height:logoHmm_pdf});
-      toast('✓ Logo SVG vectorial añadido','ok');
-    }
-    document.body.removeChild(svgEl);
-  } catch(err){ console.warn('svg2pdf error:', err); }
-}
-
+  
 // Get top-left pixel of an object (accounting for originX/Y)
 function getObjLeft(o){
   var ox=o.originX||'left', oy=o.originY||'top';
@@ -3177,6 +3181,33 @@ function getObjTop(o){
   if(oy==='center') t=t-h/2; else if(oy==='bottom') t=t-h;
   return t;
 }
+
+// PDF ruler — doc.line() per mm
+function pdfRuler(pdf,ox,oy,lenCm,axis){
+  if(!lenCm||lenCm<=0) return;
+  var lenMM=lenCm*10, tot=Math.round(lenMM);
+  pdf.setDrawColor(60,60,60); pdf.setLineWidth(0.18);
+  if(axis==='h') pdf.line(ox,oy-2,ox+lenMM,oy-2);
+  else           pdf.line(ox-2,oy,ox-2,oy+lenMM);
+  for(var i=0;i<=tot;i++){
+    var pos=(i/tot)*lenMM;
+    var is10=i%10===0, is5=i%5===0;
+    var tl=is10?4.5:is5?2.8:1.3;
+    pdf.setDrawColor(is10?50:100,is10?50:100,is10?50:100);
+    pdf.setLineWidth(is10?0.18:0.1);
+    if(axis==='h'){
+      pdf.line(ox+pos,oy-2,ox+pos,oy-2-tl);
+      if(is10&&i>0){pdf.setFontSize(5);pdf.setTextColor(55,55,55);pdf.setFont('helvetica','normal');pdf.text((i/10)+'',ox+pos-1,oy-2-tl-0.8);}
+    }else{
+      pdf.line(ox-2,oy+pos,ox-2-tl,oy+pos);
+      if(is10&&i>0){pdf.setFontSize(5);pdf.setTextColor(55,55,55);pdf.setFont('helvetica','normal');pdf.text((i/10)+'',ox-2-tl-5.5,oy+pos+1);}
+    }
+  }
+  pdf.setFontSize(4.5); pdf.setTextColor(120,120,120);
+  if(axis==='h') pdf.text('cm',ox+lenMM+1,oy-2);
+  else           pdf.text('cm',ox-2-7,oy+lenMM+2.5);
+}
+
 // ─── SAVE PROJECT ─────────────────────────────────────────────────
 function saveProj(){
   var fields={};
@@ -3334,6 +3365,140 @@ function applyLang(lang){
   // Update the .txt drop zone label only
   document.getElementById('dzlbl').textContent=t.drop;
 }
+</script>
+<script>
+// ── CAMPANITA DE PEDIDOS ─────────────────────────────────────────
+const PEDIDOS_URL = 'https://raw.githubusercontent.com/Goya-importaciones/ggoya-marcaje/main/pedidos.json';
+const LEIDOS_KEY  = 'pedidos_leidos';
+const OCULTOS_KEY = 'pedidos_ocultos';
+let _pedidosCache = [];
+
+function getPedidosLeidos()  { return JSON.parse(localStorage.getItem(LEIDOS_KEY)  || '[]'); }
+function getPedidosOcultos() { return JSON.parse(localStorage.getItem(OCULTOS_KEY) || '[]'); }
+function setPedidosLeidos(ids)  { localStorage.setItem(LEIDOS_KEY,  JSON.stringify(ids)); }
+function setPedidosOcultos(ids) { localStorage.setItem(OCULTOS_KEY, JSON.stringify(ids)); }
+
+function copiarRuta(ruta, btn) {
+  const rutaWin = ruta.replace(/\\\\\\\\/g, '\\\\').replace(/\\\\/g, '\\');
+  navigator.clipboard.writeText(rutaWin).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Copiado';
+    btn.style.color = '#4caf50';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = '#c8a96e'; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = rutaWin;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Copiado';
+    btn.style.color = '#4caf50';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.color = '#c8a96e'; }, 2000);
+  });
+}
+
+function limpiarLista() {
+  const ocultos = getPedidosOcultos();
+  const nuevosOcultos = [...new Set([...ocultos, ..._pedidosCache.map(p => p.id)])];
+  setPedidosOcultos(nuevosOcultos);
+  renderBell(_pedidosCache);
+}
+
+function renderBell(pedidos) {
+  _pedidosCache = pedidos;
+  const leidos  = getPedidosLeidos();
+  const ocultos = getPedidosOcultos();
+  const visibles = pedidos.filter(p => !ocultos.includes(p.id));
+  const nuevos   = visibles.filter(p => !leidos.includes(p.id));
+
+  const count = document.getElementById('bell-count');
+  const list  = document.getElementById('bell-list');
+
+  count.style.display = nuevos.length > 0 ? 'block' : 'none';
+  count.textContent   = nuevos.length > 99 ? '99+' : nuevos.length;
+
+  if (visibles.length === 0) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#6a6070;font-size:12px;">No hay pedidos</div>';
+    return;
+  }
+
+  list.innerHTML = visibles.map(p => {
+    const esNuevo = !leidos.includes(p.id);
+    const fecha   = new Date(p.fecha).toLocaleString('es-ES');
+    const emailCorto = (p.email || '—').replace(/<.*?>/, '').trim();
+    const asunto  = p.asunto || '—';
+    const bgColor = esNuevo ? 'rgba(200,169,110,.12)' : 'rgba(255,255,255,.03)';
+    const border  = esNuevo ? '#c8a96e55' : '#3a3a48';
+    const rutaEsc = (p.ruta || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    return `
+      <div style="padding:10px 12px;margin-bottom:6px;border-radius:4px;background:${bgColor};border:1px solid ${border};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span style="font-weight:700;font-size:13px;color:${esNuevo ? '#c8a96e' : '#e8e4dc'};">
+            ${esNuevo ? '🆕 ' : ''}${p.nombreCarpeta || '—'}
+          </span>
+          <span style="font-size:10px;background:#363642;padding:2px 6px;border-radius:3px;color:#a09888;">${p.tecnica || '—'}</span>
+        </div>
+        <div style="font-size:11px;color:#a09888;margin-bottom:2px;">📧 ${emailCorto}</div>
+        <div style="font-size:10px;color:#6a6070;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${asunto}">
+          ${asunto.length > 50 ? asunto.substring(0, 50) + '...' : asunto}
+        </div>
+        <div style="font-size:10px;color:#6a6070;margin-bottom:8px;">🕐 ${fecha}</div>
+        <button onclick="copiarRuta('${rutaEsc}', this)" style="
+          width:100%;padding:6px;border-radius:3px;border:1px solid #c8a96e55;
+          background:rgba(200,169,110,.1);color:#c8a96e;cursor:pointer;
+          font-size:10px;font-weight:600;letter-spacing:.5px;font-family:Barlow,sans-serif;
+        ">📋 Copiar ruta de carpeta</button>
+      </div>`;
+  }).join('');
+
+  // Marcar como leídos al renderizar
+  const leidosActualizados = [...new Set([...leidos, ...visibles.map(p => p.id)])];
+  setPedidosLeidos(leidosActualizados);
+  count.style.display = 'none';
+}
+
+function toggleBell() {
+  const panel = document.getElementById('bell-panel');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    fetch(PEDIDOS_URL + '?t=' + Date.now())
+      .then(r => r.json())
+      .then(data => renderBell(data.pedidos || []))
+      .catch(() => {});
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('bell-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('bell-panel').style.display = 'none';
+  }
+});
+
+function cargarPedidos() {
+  fetch(PEDIDOS_URL + '?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      const pedidos  = data.pedidos || [];
+      const leidos   = getPedidosLeidos();
+      const ocultos  = getPedidosOcultos();
+      const visibles = pedidos.filter(p => !ocultos.includes(p.id));
+      const nuevos   = visibles.filter(p => !leidos.includes(p.id));
+      _pedidosCache  = pedidos;
+      const count    = document.getElementById('bell-count');
+      count.style.display = nuevos.length > 0 ? 'block' : 'none';
+      count.textContent   = nuevos.length > 99 ? '99+' : nuevos.length;
+    })
+    .catch(() => {});
+}
+
+cargarPedidos();
+setInterval(cargarPedidos, 60000);
 </script>
 </body>
 </html>
