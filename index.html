@@ -811,58 +811,12 @@ function initFabric(){
   CV.on('object:rotating',   function(e){ if(e.target) document.getElementById('rotin').value = Math.round(e.target.angle||0); });
 
   CV.on('object:moving', function(e){
-    if(!MARKING_AREA || !e.target) return;
-    if(e.target.id !== 'logo' && e.target.id !== 'logo-copy') return;
-    
-    var obj = e.target;
-    obj.setCoords();
-    var bounds = obj.getBoundingRect();
-    
-    // Restricción: mantener dentro del área de marcaje
-    var modified = false;
-    
-    if(bounds.left < MARKING_AREA.left){
-      obj.set('left', obj.left + (MARKING_AREA.left - bounds.left));
-      modified = true;
-    }
-    if(bounds.top < MARKING_AREA.top){
-      obj.set('top', obj.top + (MARKING_AREA.top - bounds.top));
-      modified = true;
-    }
-    if(bounds.left + bounds.width > MARKING_AREA.right){
-      obj.set('left', obj.left - ((bounds.left + bounds.width) - MARKING_AREA.right));
-      modified = true;
-    }
-    if(bounds.top + bounds.height > MARKING_AREA.bottom){
-      obj.set('top', obj.top - ((bounds.top + bounds.height) - MARKING_AREA.bottom));
-      modified = true;
-    }
-    
-    if(modified){
-      obj.setCoords();
-    }
+    // Sin restricciones — movimiento libre del logo
+    livePreviewRefresh();
   });
-  CV.on('object:scaling', function(e){
-    if(!MARKING_AREA || !e.target) return;
-    if(e.target.id !== 'logo' && e.target.id !== 'logo-copy') return;
-    
-    var obj = e.target;
-    obj.setCoords();
-    var bounds = obj.getBoundingRect();
-    
-    // No permitir escalar fuera del área
-    if(bounds.left < MARKING_AREA.left || bounds.top < MARKING_AREA.top ||
-       bounds.left + bounds.width > MARKING_AREA.right ||
-       bounds.top + bounds.height > MARKING_AREA.bottom){
-      // Revertir escala
-      obj.scaleX = obj._stateProperties.scaleX;
-      obj.scaleY = obj._stateProperties.scaleY;
-      obj.setCoords();
-      toast('⚠ El logo no puede superar el área de marcaje', 'err');
-    }
-  });
+  CV.on('object:scaling', function(e){ onScaling(e); });
 
-  // ═══════════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════
   // ZOOM CON RUEDA DEL RATÓN
   // ═══════════════════════════════════════════════════════════════════
   CV.on('mouse:wheel', function(opt) {
@@ -876,54 +830,36 @@ function initFabric(){
     opt.e.stopPropagation();
   });
 
-  // ── NAVEGACIÓN CON BARRA ESPACIADORA (mano) ──────────────────────
-  var _spaceDown = false;
-  var _panStart  = null;
-  var _panVp     = null;
-
-  document.addEventListener('keydown', function(e){
-    if(e.code === 'Space' && !e.target.isContentEditable &&
-       e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+  // ── NAVEGACIÓN CON BARRA ESPACIADORA ─────────────────────────────
+  var _spaceDown=false, _panStart=null, _panVp=null;
+  document.addEventListener('keydown',function(e){
+    if(e.code==='Space'&&!e.target.isContentEditable&&e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'){
       e.preventDefault();
       if(!_spaceDown){
-        _spaceDown = true;
-        document.getElementById('cvwrap').style.cursor = 'grab';
-        CV.defaultCursor = 'grab';
-        CV.hoverCursor   = 'grab';
-        CV.selection = false;
+        _spaceDown=true;
+        document.getElementById('cvwrap').style.cursor='grab';
+        CV.defaultCursor='grab'; CV.hoverCursor='grab'; CV.selection=false;
       }
     }
   });
-  document.addEventListener('keyup', function(e){
-    if(e.code === 'Space'){
-      _spaceDown = false;
-      _panStart  = null;
-      document.getElementById('cvwrap').style.cursor = '';
-      CV.defaultCursor = 'default';
-      CV.hoverCursor   = 'move';
-      CV.selection = true;
+  document.addEventListener('keyup',function(e){
+    if(e.code==='Space'){
+      _spaceDown=false; _panStart=null;
+      document.getElementById('cvwrap').style.cursor='';
+      CV.defaultCursor='default'; CV.hoverCursor='move'; CV.selection=true;
     }
   });
-  CV.on('mouse:down', function(opt){
+  CV.on('mouse:down',function(opt){
     if(!_spaceDown) return;
-    _panStart = { x: opt.e.clientX, y: opt.e.clientY };
-    _panVp    = CV.viewportTransform.slice();
-    document.getElementById('cvwrap').style.cursor = 'grabbing';
+    _panStart={x:opt.e.clientX,y:opt.e.clientY}; _panVp=CV.viewportTransform.slice();
+    document.getElementById('cvwrap').style.cursor='grabbing';
   });
-  CV.on('mouse:move', function(opt){
-    if(!_spaceDown || !_panStart) return;
-    var dx = opt.e.clientX - _panStart.x;
-    var dy = opt.e.clientY - _panStart.y;
-    var vp = _panVp.slice();
-    vp[4] += dx; vp[5] += dy;
+  CV.on('mouse:move',function(opt){
+    if(!_spaceDown||!_panStart) return;
+    var vp=_panVp.slice(); vp[4]+=opt.e.clientX-_panStart.x; vp[5]+=opt.e.clientY-_panStart.y;
     CV.setViewportTransform(vp);
   });
-  CV.on('mouse:up', function(){
-    if(_spaceDown){
-      _panStart = null;
-      document.getElementById('cvwrap').style.cursor = 'grab';
-    }
-  });
+  CV.on('mouse:up',function(){ if(_spaceDown){_panStart=null; document.getElementById('cvwrap').style.cursor='grab';} });
 
   window.addEventListener('resize', function(){
     var a = document.getElementById('cvwrap');
@@ -1909,37 +1845,9 @@ function cancelCal(){
 
 // ─── SCALE-PAGE PREVIEW ───────────────────────────────────────────
 function updSP(){
-  var on=document.getElementById('tsp').checked;
-  var sec=document.getElementById('spsec');
-  if(!on||!LOGO){sec.style.display='none';document.getElementById('owarn').style.display='none';return;}
-  sec.style.display='block';
-  var wc=parseFloat(document.getElementById('mW').value)||5;
-  var hc=parseFloat(document.getElementById('mH').value)||5;
-  // Show logo at screen scale (96dpi) — preview only, not 1:1 print
-  var DPI=96;
-  var over=wc>(A4W/10-2)||hc>(A4H/10-2);
-  document.getElementById('owarn').style.display=over?'block':'none';
-  var sc=document.getElementById('spcanv');
-  // Size the preview canvas proportionally to logo, max 400px wide
-  var maxPx=400;
-  var ar=wc/hc;
-  var pw,ph;
-  if(ar>=1){pw=maxPx;ph=Math.round(maxPx/ar);}
-  else{ph=maxPx;pw=Math.round(maxPx*ar);}
-  sc.width=pw; sc.height=ph;
-  var ctx=sc.getContext('2d');
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,pw,ph);
-  // Use toDataURL to snapshot the logo (works for groups and images)
-  try{
-    var logoDataURL = LOGO.toDataURL({format:'png', multiplier:2});
-    var im=new Image();
-    im.onload=function(){ ctx.drawImage(im,0,0,pw,ph); };
-    im.src=logoDataURL;
-  }catch(e){
-    // Fallback: getElement for simple images
-    var el=LOGO.getElement?LOGO.getElement():null;
-    if(el) ctx.drawImage(el,0,0,pw,ph);
-  }
+  _renderSP11();
+  // Si la vista doc está abierta, refrescar para mostrar/ocultar p2
+  if(document.getElementById('doc').classList.contains('open')) renderLivePreview();
 }
 function setOv(m){
   OVMODE=m;
@@ -1972,52 +1880,86 @@ function renderLivePreview(){
   var box  = document.getElementById('csnap');
   if(!img || !box) return;
 
-  // Resetear zoom para snapshot limpio
+  // Reset zoom para snapshot limpio
   var savedVp = CV.viewportTransform.slice();
   CV.setViewportTransform([1,0,0,1,0,0]);
-  // Ocultar MARKING_RECT y fondo blanco
+  // Ocultar MARKING_RECT y poner fondo blanco
   var mrVisible = MARKING_RECT ? MARKING_RECT.visible : false;
   if(MARKING_RECT) MARKING_RECT.set('visible', false);
+  // Detectar si el logo es muy claro y aplicar color de contraste para preview
+  _applyLogoContrast(true);
   CV.set('backgroundColor','#ffffff');
   CV.renderAll();
 
-  var cropURL;
+  var cropURL = null;
   try{
     if(PROD){
-      var bb = PROD.getBoundingRect(true, true);
+      var bb = PROD.getBoundingRect(true,true);
       var pad = 20;
-      var cX = Math.max(0, bb.left - pad);
-      var cY = Math.max(0, bb.top  - pad);
-      var cW = Math.min(CV.width  - cX, bb.width  + pad*2);
-      var cH = Math.min(CV.height - cY, bb.height + pad*2);
-      cropURL = CV.toDataURL({format:'jpeg', quality:0.92, left:cX, top:cY, width:cW, height:cH});
+      var cX = Math.max(0, bb.left-pad), cY = Math.max(0, bb.top-pad);
+      var cW = Math.min(CV.width-cX, bb.width+pad*2), cH = Math.min(CV.height-cY, bb.height+pad*2);
+      cropURL = CV.toDataURL({format:'jpeg',quality:0.92,left:cX,top:cY,width:cW,height:cH});
     } else {
-      cropURL = CV.toDataURL({format:'jpeg', quality:0.92});
+      cropURL = CV.toDataURL({format:'jpeg',quality:0.92});
     }
   } catch(e){ cropURL = null; }
 
-  // Restaurar
+  // Restaurar todo
+  _applyLogoContrast(false);
   if(MARKING_RECT) MARKING_RECT.set('visible', mrVisible);
   CV.set('backgroundColor', null);
   CV.setViewportTransform(savedVp);
   CV.renderAll();
 
-  if(cropURL){
-    _showPreview(cropURL, box, img, hint);
-  } else {
-    // Fallback: solo imagen del producto desde URL
-    var zoneImgUrl = null;
-    if(CURRENT_PRODUCT && window.CURRENT_TECHNIQUE_IDX !== undefined){
-      var activeArea = CURRENT_PRODUCT.marking_areas[window.CURRENT_TECHNIQUE_IDX];
-      if(activeArea && activeArea.image_url) zoneImgUrl = activeArea.image_url;
+  if(cropURL) _showPreview(cropURL, box, img, hint);
+  _renderSP11();
+}
+
+// Detecta si el logo es claro (casi blanco) y aplica negro temporalmente
+function _isColorLight(hex){
+  var rgb = h2r(hex||'#000');
+  // Luminosidad perceptual
+  return (0.299*rgb.r + 0.587*rgb.g + 0.114*rgb.b) > 200;
+}
+var _logoColorBackup = null;
+function _applyLogoContrast(apply){
+  if(!LOGO) return;
+  if(apply){
+    if(_isColorLight(HEX)){
+      _logoColorBackup = HEX;
+      // Aplicar negro temporalmente para que se vea sobre fondo blanco
+      applyColorRec(LOGO, '#1a1a1a');
+      LOGO.dirty = true;
     }
-    var previewUrl = zoneImgUrl || (CURRENT_PRODUCT ? CURRENT_PRODUCT.image_url : null);
-    if(previewUrl){
-      imgUrlToBase64(previewUrl).then(function(b64){ _showPreview(b64, box, img, hint); }).catch(function(){});
+  } else {
+    if(_logoColorBackup){
+      applyColorRec(LOGO, _logoColorBackup);
+      LOGO.dirty = true;
+      _logoColorBackup = null;
     }
   }
+}
 
-  _renderSP11();
+// Renderiza sección 1:1 en vista doc
+function _renderSP11(){
+  var sec = document.getElementById('spsec');
+  var on  = document.getElementById('tsp').checked;
+  if(!on||!LOGO){ sec.style.display='none'; return; }
+  sec.style.display='block';
+  var wc=parseFloat(document.getElementById('mW').value)||5;
+  var hc=parseFloat(document.getElementById('mH').value)||5;
+  var over=wc>(A4W/10-2)||hc>(A4H/10-2);
+  document.getElementById('owarn').style.display=over?'block':'none';
+  var sc=document.getElementById('spcanv');
+  var ar=wc/hc, maxPx=400, pw, ph;
+  if(ar>=1){pw=maxPx;ph=Math.round(maxPx/ar);}else{ph=maxPx;pw=Math.round(maxPx*ar);}
+  sc.width=pw; sc.height=ph;
+  var ctx=sc.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,pw,ph);
+  try{
+    var logoDataURL=LOGO.toDataURL({format:'png',multiplier:2});
+    var im=new Image(); im.onload=function(){ctx.drawImage(im,0,0,pw,ph);}; im.src=logoDataURL;
+  }catch(e){}
 }
 
 function _showPreview(cropURL, box, img, hint){
@@ -3111,16 +3053,13 @@ async function genPDF(){
     }
   }
 
-  // Fallback: snapshot del canvas (sin zoom, sin marking rect)
+  // Fallback: snapshot del canvas (reset zoom + sin marking rect)
   if(!imageLoaded){
     try{
-      // Resetear zoom para snapshot limpio
-      var currentZoom = CV.getZoom();
-      var currentVp   = CV.viewportTransform.slice();
+      var savedVpPDF = CV.viewportTransform.slice();
       CV.setViewportTransform([1,0,0,1,0,0]);
       if(MARKING_RECT) MARKING_RECT.set('visible', false);
       CV.renderAll();
-
       var cropURL;
       if(PROD){
         var bb  = PROD.getBoundingRect(true,true);
@@ -3133,63 +3072,50 @@ async function genPDF(){
       } else {
         cropURL = CV.toDataURL({format:'jpeg',quality:0.95});
       }
-
-      // Restaurar zoom
-      CV.setViewportTransform(currentVp);
+      CV.setViewportTransform(savedVpPDF);
       if(MARKING_RECT) MARKING_RECT.set('visible', MARKING_AREA_VISIBLE);
       CV.renderAll();
-
       pdf.setFillColor(255,255,255);
       pdf.addImage(cropURL,'JPEG',centreX,imgTopY,drawWmm,drawHmm);
       imageLoaded = true;
     } catch(err){ console.warn('snapshot fallback:', err); }
   }
 
-  // ── Logo SVG vectorial encima del producto (página 1) ──────────────
-  if(imageLoaded && LOGO && typeof svg2pdf !== 'undefined' && svg2pdf.svg2pdf){
+  // ── Logo vectorial SVG encima del producto (página 1) ──────────────
+  if(imageLoaded && LOGO){
     try{
-      // Exportar logo como SVG
-      var svgStr = LOGO.toSVG();
-      var tmpDiv = document.createElement('div');
-      tmpDiv.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
-      tmpDiv.innerHTML = svgStr;
-      document.body.appendChild(tmpDiv);
-      var svgNode = tmpDiv.querySelector('svg');
+      // Color de contraste: si logo es muy claro, usar negro en el PDF
+      var pdfLogoColor = _isColorLight(HEX) ? '#1a1a1a' : null;
+      if(pdfLogoColor) applyColorRec(LOGO, pdfLogoColor);
 
-      if(svgNode && PROD){
-        // Calcular posición del logo relativa al producto, proyectada en mm del PDF
-        var prodBB = PROD.getBoundingRect(true,true);
-        var logoBB = LOGO.getBoundingRect(true,true);
-
-        // Ratio: mm del PDF por pixel del canvas (sin zoom)
-        var pxToMmX = drawWmm / prodBB.width;
-        var pxToMmY = drawHmm / prodBB.height;
-
-        var logoXmm = centreX + (logoBB.left - prodBB.left) * pxToMmX;
-        var logoYmm = imgTopY + (logoBB.top  - prodBB.top)  * pxToMmY;
-        var logoWmm_pdf = logoBB.width  * pxToMmX;
-        var logoHmm_pdf = logoBB.height * pxToMmY;
-
-        await svg2pdf.svg2pdf(svgNode, pdf, {
-          x: logoXmm, y: logoYmm,
-          width: logoWmm_pdf, height: logoHmm_pdf
-        });
-      }
-      document.body.removeChild(tmpDiv);
-    } catch(err){ console.warn('svg2pdf p1:', err); }
-  } else if(imageLoaded && LOGO){
-    // Fallback PNG si svg2pdf no disponible
-    try{
+      var prodBB = PROD ? PROD.getBoundingRect(true,true) : {left:centreX,top:imgTopY,width:drawWmm/0.264583,height:drawHmm/0.264583};
       var logoBB = LOGO.getBoundingRect(true,true);
-      var prodBB = PROD ? PROD.getBoundingRect(true,true) : {left:0,top:0,width:CV.width,height:CV.height};
       var pxToMmX = drawWmm / prodBB.width;
       var pxToMmY = drawHmm / prodBB.height;
-      var logoPNG = LOGO.toDataURL({format:'png', multiplier:4});
-      pdf.addImage(logoPNG,'PNG',
-        centreX + (logoBB.left - prodBB.left) * pxToMmX,
-        imgTopY + (logoBB.top  - prodBB.top)  * pxToMmY,
-        logoBB.width * pxToMmX, logoBB.height * pxToMmY);
-    } catch(err){ console.warn('logo png p1:', err); }
+      var logoXmm  = centreX + (logoBB.left - prodBB.left) * pxToMmX;
+      var logoYmm  = imgTopY + (logoBB.top  - prodBB.top)  * pxToMmY;
+      var logoWpdf = logoBB.width  * pxToMmX;
+      var logoHpdf = logoBB.height * pxToMmY;
+
+      if(typeof svg2pdf !== 'undefined' && svg2pdf.svg2pdf){
+        var svgStr = LOGO.toSVG();
+        var tmpDiv = document.createElement('div');
+        tmpDiv.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+        tmpDiv.innerHTML = svgStr;
+        document.body.appendChild(tmpDiv);
+        var svgNode = tmpDiv.querySelector('svg');
+        if(svgNode) await svg2pdf.svg2pdf(svgNode, pdf, {x:logoXmm,y:logoYmm,width:logoWpdf,height:logoHpdf});
+        document.body.removeChild(tmpDiv);
+      } else {
+        // Fallback PNG alta resolución
+        var logoPNG = LOGO.toDataURL({format:'png', multiplier:5});
+        pdf.addImage(logoPNG,'PNG',logoXmm,logoYmm,logoWpdf,logoHpdf);
+      }
+
+      // Restaurar color original
+      if(pdfLogoColor) applyColorRec(LOGO, HEX);
+      CV.renderAll();
+    } catch(err){ console.warn('logo p1:', err); }
   }
 
   if(document.getElementById('doc') && document.getElementById('doc').classList.contains('open')){
@@ -3212,42 +3138,40 @@ async function genPDF(){
   }
 
   // Aviso legal
-  var noticeTopY = msgY;
-  var legalLines=[
-    (t.notice_title||'POR FAVOR, LEA DETENIDAMENTE').toUpperCase(),'',
-    'Para ver el tamaño real de marcaje y hacerse una idea de cómo se verá su diseño una vez marcado el',
-    'producto, le recomendamos imprimir el archivo en un DIN A4 sin escalar.','',
-    'El archivo que se utilizará para el marcaje es el que aparece separado del montaje o está en las',
-    'siguientes páginas del documento. No utilice el montaje para el marcaje.','',
-    'Los colores que se muestran en pantalla pueden variar respecto al resultado final impreso. '+(t.notice2h||''),'',
-    'Revise todos los datos antes de confirmar. '+(t.notice3h||''),'',
-    t.notice4||'Puede haber una variación de +/−5% de la cantidad solicitada.'
+  // ── Aviso legal compacto (máx 4 líneas, reservar espacio para footer) ──
+  var FOOTER_H = 10; // espacio reservado para el pie de página
+  var availNotice = PH - msgY - FOOTER_H - 4;
+  var noticeLines = [
+    t.notice1 || 'Para ver el tamaño real le recomendamos imprimir en DIN A4 sin escalar.',
+    t.notice2h || 'Los colores en pantalla pueden variar respecto al resultado impreso.',
+    t.notice3h || 'Una vez confirmado el boceto no nos haremos responsables de errores.',
+    t.notice4  || 'Puede haber una variación de +/−5% de la cantidad solicitada.'
   ];
-  var noticeH = legalLines.length*4.8+14;
-  if(noticeH<38) noticeH=38;
-  pdf.setFillColor(255,251,242); pdf.setDrawColor(232,216,176); pdf.setLineWidth(0.3);
-  pdf.rect(MG,noticeTopY,PW-MG*2,noticeH,'FD');
-  var lly=noticeTopY+6;
-  legalLines.forEach(function(line,i){
-    if(i===0){
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(7); pdf.setTextColor(139,115,85);
-      pdf.text(line,MG+3,lly); lly+=5.5;
-    } else if(line===''){
-      lly+=2;
-    } else {
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(6); pdf.setTextColor(100,100,100);
-      var split=pdf.splitTextToSize(line,PW-MG*2-6);
-      pdf.text(split,MG+3,lly); lly+=split.length*4.2+1;
-    }
-  });
+  var noticeH = Math.min(availNotice, 28);
+  if(noticeH > 5){
+    pdf.setFillColor(255,251,242); pdf.setDrawColor(232,216,176); pdf.setLineWidth(0.2);
+    pdf.rect(MG, msgY, PW-MG*2, noticeH, 'FD');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(139,115,85);
+    pdf.text((t.notice_title||'POR FAVOR, LEA DETENIDAMENTE').toUpperCase(), MG+3, msgY+4);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(5.5); pdf.setTextColor(100,100,100);
+    var nly = msgY+8;
+    noticeLines.forEach(function(line){
+      if(nly + 4 > msgY + noticeH - 2) return;
+      var split = pdf.splitTextToSize('• '+line, PW-MG*2-6);
+      pdf.text(split[0], MG+3, nly);
+      nly += 4;
+    });
+  }
 
-  // Footer p1
+  // Footer p1 — siempre en la parte inferior sin solaparse
   var refEl=document.querySelector('[data-field="referencia"]');
   var cliEl=document.querySelector('[data-field="cliente"]');
   var tecEl=document.querySelector('[data-field="tecnica"]');
-  pdf.setFontSize(7); pdf.setTextColor(170,170,170); pdf.setFont('helvetica','normal');
-  pdf.text('Ref. '+(refEl?refEl.textContent.trim():'')+' · '+(cliEl?cliEl.textContent.trim():'')+' · '+(tecEl?tecEl.textContent.trim():''),MG,PH-5);
-  pdf.text(new Date().toLocaleDateString(),PW-MG,PH-5,{align:'right'});
+  pdf.setDrawColor(220,220,220); pdf.setLineWidth(0.2);
+  pdf.line(MG, PH-FOOTER_H, PW-MG, PH-FOOTER_H);
+  pdf.setFontSize(6.5); pdf.setTextColor(170,170,170); pdf.setFont('helvetica','normal');
+  pdf.text('Ref. '+(refEl?refEl.textContent.trim():'')+' · '+(cliEl?cliEl.textContent.trim():''), MG, PH-5);
+  pdf.text(new Date().toLocaleDateString(), PW-MG, PH-5, {align:'right'});
 
   // ── PÁGINA 2: Logo a escala real 1:1 ──────────────────────────────
   if(document.getElementById('tsp').checked){
@@ -3269,8 +3193,11 @@ async function genPDF(){
     if(logoWmm<=usableW2 && logoHmm<=usableH2){
       var lx2=MG+(usableW2-logoWmm)/2, ly2=p2Y+(usableH2-logoHmm)/2;
 
-      // Intentar SVG vectorial primero
-      var svgAddedP2 = false;
+      // Color de contraste para página 2 (fondo blanco)
+      var pdfLogoColor2 = _isColorLight(HEX) ? '#1a1a1a' : null;
+      if(pdfLogoColor2 && LOGO) applyColorRec(LOGO, pdfLogoColor2);
+
+      var svgDoneP2 = false;
       if(LOGO && typeof svg2pdf !== 'undefined' && svg2pdf.svg2pdf){
         try{
           var svgStr2 = LOGO.toSVG();
@@ -3280,25 +3207,24 @@ async function genPDF(){
           document.body.appendChild(tmpDiv2);
           var svgNode2 = tmpDiv2.querySelector('svg');
           if(svgNode2){
-            await svg2pdf.svg2pdf(svgNode2, pdf, {x:lx2, y:ly2, width:logoWmm, height:logoHmm});
-            svgAddedP2 = true;
+            await svg2pdf.svg2pdf(svgNode2, pdf, {x:lx2,y:ly2,width:logoWmm,height:logoHmm});
+            svgDoneP2 = true;
           }
           document.body.removeChild(tmpDiv2);
-        } catch(e){ console.warn('svg2pdf p2:', e); }
+        } catch(e){ console.warn('svg2pdf p2:',e); }
       }
-
-      // Fallback PNG alta resolución
-      if(!svgAddedP2){
+      if(!svgDoneP2){
+        // Fallback PNG muy alta resolución
         CV.getObjects().forEach(function(o){
           if(o.id!=='logo'&&o.id!=='logo-copy') return;
           try{
             var logoPNG=o.toDataURL({format:'png',multiplier:6});
             pdf.addImage(logoPNG,'PNG',lx2,ly2,logoWmm,logoHmm);
-            lx2+=logoWmm+8;
-            if(lx2+logoWmm>MG+usableW2){lx2=MG;ly2+=logoHmm+8;}
           }catch(e){console.warn('logo p2 png:',e);}
         });
       }
+
+      if(pdfLogoColor2 && LOGO){ applyColorRec(LOGO, HEX); CV.renderAll(); }
 
       if(document.getElementById('trul').checked){
         pdfRuler(pdf,MG,p2Y,usableW2/10,'h');
