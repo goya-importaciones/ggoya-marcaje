@@ -811,10 +811,56 @@ function initFabric(){
   CV.on('object:rotating',   function(e){ if(e.target) document.getElementById('rotin').value = Math.round(e.target.angle||0); });
 
   CV.on('object:moving', function(e){
-    // Sin restricciones de movimiento — el usuario puede mover libremente el logo
-    livePreviewRefresh();
+    if(!MARKING_AREA || !e.target) return;
+    if(e.target.id !== 'logo' && e.target.id !== 'logo-copy') return;
+    
+    var obj = e.target;
+    obj.setCoords();
+    var bounds = obj.getBoundingRect();
+    
+    // Restricción: mantener dentro del área de marcaje
+    var modified = false;
+    
+    if(bounds.left < MARKING_AREA.left){
+      obj.set('left', obj.left + (MARKING_AREA.left - bounds.left));
+      modified = true;
+    }
+    if(bounds.top < MARKING_AREA.top){
+      obj.set('top', obj.top + (MARKING_AREA.top - bounds.top));
+      modified = true;
+    }
+    if(bounds.left + bounds.width > MARKING_AREA.right){
+      obj.set('left', obj.left - ((bounds.left + bounds.width) - MARKING_AREA.right));
+      modified = true;
+    }
+    if(bounds.top + bounds.height > MARKING_AREA.bottom){
+      obj.set('top', obj.top - ((bounds.top + bounds.height) - MARKING_AREA.bottom));
+      modified = true;
+    }
+    
+    if(modified){
+      obj.setCoords();
+    }
   });
-  CV.on('object:scaling', function(e){ onScaling(e); });
+  CV.on('object:scaling', function(e){
+    if(!MARKING_AREA || !e.target) return;
+    if(e.target.id !== 'logo' && e.target.id !== 'logo-copy') return;
+    
+    var obj = e.target;
+    obj.setCoords();
+    var bounds = obj.getBoundingRect();
+    
+    // No permitir escalar fuera del área
+    if(bounds.left < MARKING_AREA.left || bounds.top < MARKING_AREA.top ||
+       bounds.left + bounds.width > MARKING_AREA.right ||
+       bounds.top + bounds.height > MARKING_AREA.bottom){
+      // Revertir escala
+      obj.scaleX = obj._stateProperties.scaleX;
+      obj.scaleY = obj._stateProperties.scaleY;
+      obj.setCoords();
+      toast('⚠ El logo no puede superar el área de marcaje', 'err');
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════════════
   // ZOOM CON RUEDA DEL RATÓN
@@ -823,16 +869,60 @@ function initFabric(){
     var delta = opt.e.deltaY;
     var zoom = CV.getZoom();
     zoom *= 0.999 ** delta;
-    
-    // Límites de zoom
     if (zoom > 5) zoom = 5;
     if (zoom < 0.5) zoom = 0.5;
-    
-    // Zoom centrado en el cursor
     CV.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-    
     opt.e.preventDefault();
     opt.e.stopPropagation();
+  });
+
+  // ── NAVEGACIÓN CON BARRA ESPACIADORA (mano) ──────────────────────
+  var _spaceDown = false;
+  var _panStart  = null;
+  var _panVp     = null;
+
+  document.addEventListener('keydown', function(e){
+    if(e.code === 'Space' && !e.target.isContentEditable &&
+       e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+      e.preventDefault();
+      if(!_spaceDown){
+        _spaceDown = true;
+        document.getElementById('cvwrap').style.cursor = 'grab';
+        CV.defaultCursor = 'grab';
+        CV.hoverCursor   = 'grab';
+        CV.selection = false;
+      }
+    }
+  });
+  document.addEventListener('keyup', function(e){
+    if(e.code === 'Space'){
+      _spaceDown = false;
+      _panStart  = null;
+      document.getElementById('cvwrap').style.cursor = '';
+      CV.defaultCursor = 'default';
+      CV.hoverCursor   = 'move';
+      CV.selection = true;
+    }
+  });
+  CV.on('mouse:down', function(opt){
+    if(!_spaceDown) return;
+    _panStart = { x: opt.e.clientX, y: opt.e.clientY };
+    _panVp    = CV.viewportTransform.slice();
+    document.getElementById('cvwrap').style.cursor = 'grabbing';
+  });
+  CV.on('mouse:move', function(opt){
+    if(!_spaceDown || !_panStart) return;
+    var dx = opt.e.clientX - _panStart.x;
+    var dy = opt.e.clientY - _panStart.y;
+    var vp = _panVp.slice();
+    vp[4] += dx; vp[5] += dy;
+    CV.setViewportTransform(vp);
+  });
+  CV.on('mouse:up', function(){
+    if(_spaceDown){
+      _panStart = null;
+      document.getElementById('cvwrap').style.cursor = 'grab';
+    }
   });
 
   window.addEventListener('resize', function(){
@@ -1821,14 +1911,35 @@ function cancelCal(){
 function updSP(){
   var on=document.getElementById('tsp').checked;
   var sec=document.getElementById('spsec');
-  if(!on||!LOGO){sec.style.display='none';document.getElementById('owarn').style.display='none';
-    // Si el doc está abierto y se desactiva 1:1, refrescar para quitar pg2
-    if(document.getElementById('doc').classList.contains('open')) renderLivePreview();
-    return;
+  if(!on||!LOGO){sec.style.display='none';document.getElementById('owarn').style.display='none';return;}
+  sec.style.display='block';
+  var wc=parseFloat(document.getElementById('mW').value)||5;
+  var hc=parseFloat(document.getElementById('mH').value)||5;
+  // Show logo at screen scale (96dpi) — preview only, not 1:1 print
+  var DPI=96;
+  var over=wc>(A4W/10-2)||hc>(A4H/10-2);
+  document.getElementById('owarn').style.display=over?'block':'none';
+  var sc=document.getElementById('spcanv');
+  // Size the preview canvas proportionally to logo, max 400px wide
+  var maxPx=400;
+  var ar=wc/hc;
+  var pw,ph;
+  if(ar>=1){pw=maxPx;ph=Math.round(maxPx/ar);}
+  else{ph=maxPx;pw=Math.round(maxPx*ar);}
+  sc.width=pw; sc.height=ph;
+  var ctx=sc.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,pw,ph);
+  // Use toDataURL to snapshot the logo (works for groups and images)
+  try{
+    var logoDataURL = LOGO.toDataURL({format:'png', multiplier:2});
+    var im=new Image();
+    im.onload=function(){ ctx.drawImage(im,0,0,pw,ph); };
+    im.src=logoDataURL;
+  }catch(e){
+    // Fallback: getElement for simple images
+    var el=LOGO.getElement?LOGO.getElement():null;
+    if(el) ctx.drawImage(el,0,0,pw,ph);
   }
-  // La lógica de render está centralizada en _renderSP11
-  _renderSP11();
-  if(document.getElementById('doc').classList.contains('open')) renderLivePreview();
 }
 function setOv(m){
   OVMODE=m;
@@ -1861,18 +1972,18 @@ function renderLivePreview(){
   var box  = document.getElementById('csnap');
   if(!img || !box) return;
 
-  // Snapshot del canvas completo (producto + logo encima tal como están)
-  // Fondo blanco temporal para PDF look
-  CV.set('backgroundColor','#ffffff'); CV.renderAll();
-
-  // Ocultar temporalmente el MARKING_RECT para que no salga en la preview
-  var mrVisible = false;
-  if(MARKING_RECT){ mrVisible = MARKING_RECT.visible; MARKING_RECT.set('visible', false); CV.renderAll(); }
+  // Resetear zoom para snapshot limpio
+  var savedVp = CV.viewportTransform.slice();
+  CV.setViewportTransform([1,0,0,1,0,0]);
+  // Ocultar MARKING_RECT y fondo blanco
+  var mrVisible = MARKING_RECT ? MARKING_RECT.visible : false;
+  if(MARKING_RECT) MARKING_RECT.set('visible', false);
+  CV.set('backgroundColor','#ffffff');
+  CV.renderAll();
 
   var cropURL;
   try{
     if(PROD){
-      // Crop al bounding box del producto para eliminar espacio vacío
       var bb = PROD.getBoundingRect(true, true);
       var pad = 20;
       var cX = Math.max(0, bb.left - pad);
@@ -1883,19 +1994,18 @@ function renderLivePreview(){
     } else {
       cropURL = CV.toDataURL({format:'jpeg', quality:0.92});
     }
-  } catch(e){
-    console.warn('canvas tainted, intentando sin logo:', e);
-    cropURL = null;
-  }
+  } catch(e){ cropURL = null; }
 
-  // Restaurar MARKING_RECT y fondo
+  // Restaurar
   if(MARKING_RECT) MARKING_RECT.set('visible', mrVisible);
-  CV.set('backgroundColor', null); CV.renderAll();
+  CV.set('backgroundColor', null);
+  CV.setViewportTransform(savedVp);
+  CV.renderAll();
 
   if(cropURL){
     _showPreview(cropURL, box, img, hint);
   } else {
-    // Fallback: imagen del producto sola desde URL
+    // Fallback: solo imagen del producto desde URL
     var zoneImgUrl = null;
     if(CURRENT_PRODUCT && window.CURRENT_TECHNIQUE_IDX !== undefined){
       var activeArea = CURRENT_PRODUCT.marking_areas[window.CURRENT_TECHNIQUE_IDX];
@@ -1907,40 +2017,7 @@ function renderLivePreview(){
     }
   }
 
-  // Sección 1:1 en la vista doc
   _renderSP11();
-}
-
-// Renderiza la sección 1:1 en la vista doc (reactiva al toggle)
-function _renderSP11(){
-  var sec = document.getElementById('spsec');
-  var on  = document.getElementById('tsp').checked;
-  if(!on || !LOGO){ sec.style.display='none'; return; }
-  sec.style.display = 'block';
-
-  var wc = parseFloat(document.getElementById('mW').value) || 5;
-  var hc = parseFloat(document.getElementById('mH').value) || 5;
-  var over = wc > (A4W/10-2) || hc > (A4H/10-2);
-  document.getElementById('owarn').style.display = over ? 'block' : 'none';
-
-  var sc  = document.getElementById('spcanv');
-  var ar  = wc / hc;
-  var maxPx = 400;
-  var pw, ph;
-  if(ar >= 1){ pw = maxPx; ph = Math.round(maxPx/ar); }
-  else        { ph = maxPx; pw = Math.round(maxPx*ar); }
-  sc.width = pw; sc.height = ph;
-  var ctx = sc.getContext('2d');
-  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,pw,ph);
-  try{
-    var logoDataURL = LOGO.toDataURL({format:'png', multiplier:2});
-    var im = new Image();
-    im.onload = function(){ ctx.drawImage(im, 0, 0, pw, ph); };
-    im.src = logoDataURL;
-  } catch(e){
-    var el = LOGO.getElement ? LOGO.getElement() : null;
-    if(el) ctx.drawImage(el, 0, 0, pw, ph);
-  }
 }
 
 function _showPreview(cropURL, box, img, hint){
@@ -2489,22 +2566,21 @@ function showTechniqueSelector(prod){
   // Función para obtener nombre de técnica por familia
   function getTechniqueName(family){
     var names = {
-      'C': 'SERIGRAFÍA C', 'F': 'SERIGRAFÍA F', 'K': 'SERIGRAFÍA K',
-      'SC': 'SERIGRAFÍA CIRCULAR', 'J': 'SERIGRAFÍA J', 'G': 'SERIGRAFÍA G',
-      'H': 'SERIGRAFÍA H', 'Y': 'SERIGRAFÍA Y',
-      'B': 'TAMPOGRAFÍA B', 'A': 'TAMPOGRAFÍA A', 'BT': 'TAMPOGRAFÍA BOTELLAS',
-      'PT': 'TAMPOGRAFÍA PT', 'TA': 'TAMPOGRAFÍA TA', 'TC': 'TAMPOGRAFÍA TC',
-      'TS': 'TAMPOGRAFÍA TS',
-      'L': 'LÁSER L', 'LC': 'LÁSER LC', 'LM': 'LÁSER METAL', 'E': 'GRABADO LÁSER',
-      'DG': 'DIGITAL', 'DP': 'DIGITAL DP', 'DTF': 'DTF', 'DTG': 'DTG', 'D': 'DIGITAL D',
-      'P': 'IMPRESIÓN P', 'S': 'SUBLIMACIÓN', 'SBB': 'SUBLIMACIÓN BOTELLA',
-      'SUBB': 'SUBLIMACIÓN', 'SUBLIMACIONEU': 'SUBLIMACIÓN EU', 'CLICHESUB': 'CLISÉ SUB',
-      'BORDADO': 'BORDADO',
-      'ETIQUETA': 'ETIQUETA', 'ETIQUETACUADRADAGRAN': 'ETIQUETA CUADRADA GRAN',
-      'ETIQUETACUADRADAPEQ': 'ETIQUETA CUADRADA PEQ', 'ETIQUETAREDGRAN': 'ETIQUETA REDONDA GRAN',
-      'ETIQUETAREDPEQ': 'ETIQUETA REDONDA PEQ',
-      'SI': 'SERIGRAFÍA INT.', 'TI': 'TRANSFER', 'TIC': 'TRANSFER TIC',
-      'ORIGIN': 'ORIGIN', 'DGGERMINA': 'DIGITAL GERMINA',
+      'C':'SERIGRAFÍA C','F':'SERIGRAFÍA F','K':'SERIGRAFÍA K',
+      'SC':'SERIGRAFÍA CIRCULAR','J':'SERIGRAFÍA J','G':'SERIGRAFÍA G',
+      'H':'SERIGRAFÍA H','Y':'SERIGRAFÍA Y',
+      'B':'TAMPOGRAFÍA B','A':'TAMPOGRAFÍA A','BT':'TAMPOGRAFÍA BOTELLAS',
+      'PT':'TAMPOGRAFÍA PT','TA':'TAMPOGRAFÍA TA','TC':'TAMPOGRAFÍA TC','TS':'TAMPOGRAFÍA TS',
+      'L':'LÁSER L','LC':'LÁSER LC','LM':'LÁSER METAL','E':'GRABADO LÁSER',
+      'DG':'DIGITAL','DP':'DIGITAL DP','DTF':'DTF','DTG':'DTG','D':'DIGITAL D',
+      'P':'IMPRESIÓN P','S':'SUBLIMACIÓN','SBB':'SUBLIMACIÓN BOTELLA',
+      'SUBB':'SUBLIMACIÓN','SUBLIMACIONEU':'SUBLIMACIÓN EU','CLICHESUB':'CLISÉ SUB',
+      'BORDADO':'BORDADO',
+      'ETIQUETA':'ETIQUETA','ETIQUETACUADRADAGRAN':'ETIQUETA CUADRADA GRAN',
+      'ETIQUETACUADRADAPEQ':'ETIQUETA CUADRADA PEQ',
+      'ETIQUETAREDGRAN':'ETIQUETA REDONDA GRAN','ETIQUETAREDPEQ':'ETIQUETA REDONDA PEQ',
+      'SI':'SERIGRAFÍA INT.','TI':'TRANSFER','TIC':'TRANSFER TIC',
+      'ORIGIN':'ORIGIN','DGGERMINA':'DIGITAL GERMINA',
     };
     return names[family] || family;
   }
@@ -3035,9 +3111,16 @@ async function genPDF(){
     }
   }
 
-  // Fallback: snapshot del canvas
+  // Fallback: snapshot del canvas (sin zoom, sin marking rect)
   if(!imageLoaded){
     try{
+      // Resetear zoom para snapshot limpio
+      var currentZoom = CV.getZoom();
+      var currentVp   = CV.viewportTransform.slice();
+      CV.setViewportTransform([1,0,0,1,0,0]);
+      if(MARKING_RECT) MARKING_RECT.set('visible', false);
+      CV.renderAll();
+
       var cropURL;
       if(PROD){
         var bb  = PROD.getBoundingRect(true,true);
@@ -3050,9 +3133,63 @@ async function genPDF(){
       } else {
         cropURL = CV.toDataURL({format:'jpeg',quality:0.95});
       }
+
+      // Restaurar zoom
+      CV.setViewportTransform(currentVp);
+      if(MARKING_RECT) MARKING_RECT.set('visible', MARKING_AREA_VISIBLE);
+      CV.renderAll();
+
       pdf.setFillColor(255,255,255);
       pdf.addImage(cropURL,'JPEG',centreX,imgTopY,drawWmm,drawHmm);
+      imageLoaded = true;
     } catch(err){ console.warn('snapshot fallback:', err); }
+  }
+
+  // ── Logo SVG vectorial encima del producto (página 1) ──────────────
+  if(imageLoaded && LOGO && typeof svg2pdf !== 'undefined' && svg2pdf.svg2pdf){
+    try{
+      // Exportar logo como SVG
+      var svgStr = LOGO.toSVG();
+      var tmpDiv = document.createElement('div');
+      tmpDiv.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+      tmpDiv.innerHTML = svgStr;
+      document.body.appendChild(tmpDiv);
+      var svgNode = tmpDiv.querySelector('svg');
+
+      if(svgNode && PROD){
+        // Calcular posición del logo relativa al producto, proyectada en mm del PDF
+        var prodBB = PROD.getBoundingRect(true,true);
+        var logoBB = LOGO.getBoundingRect(true,true);
+
+        // Ratio: mm del PDF por pixel del canvas (sin zoom)
+        var pxToMmX = drawWmm / prodBB.width;
+        var pxToMmY = drawHmm / prodBB.height;
+
+        var logoXmm = centreX + (logoBB.left - prodBB.left) * pxToMmX;
+        var logoYmm = imgTopY + (logoBB.top  - prodBB.top)  * pxToMmY;
+        var logoWmm_pdf = logoBB.width  * pxToMmX;
+        var logoHmm_pdf = logoBB.height * pxToMmY;
+
+        await svg2pdf.svg2pdf(svgNode, pdf, {
+          x: logoXmm, y: logoYmm,
+          width: logoWmm_pdf, height: logoHmm_pdf
+        });
+      }
+      document.body.removeChild(tmpDiv);
+    } catch(err){ console.warn('svg2pdf p1:', err); }
+  } else if(imageLoaded && LOGO){
+    // Fallback PNG si svg2pdf no disponible
+    try{
+      var logoBB = LOGO.getBoundingRect(true,true);
+      var prodBB = PROD ? PROD.getBoundingRect(true,true) : {left:0,top:0,width:CV.width,height:CV.height};
+      var pxToMmX = drawWmm / prodBB.width;
+      var pxToMmY = drawHmm / prodBB.height;
+      var logoPNG = LOGO.toDataURL({format:'png', multiplier:4});
+      pdf.addImage(logoPNG,'PNG',
+        centreX + (logoBB.left - prodBB.left) * pxToMmX,
+        imgTopY + (logoBB.top  - prodBB.top)  * pxToMmY,
+        logoBB.width * pxToMmX, logoBB.height * pxToMmY);
+    } catch(err){ console.warn('logo png p1:', err); }
   }
 
   if(document.getElementById('doc') && document.getElementById('doc').classList.contains('open')){
@@ -3131,15 +3268,38 @@ async function genPDF(){
     var p2Y=MG+20;
     if(logoWmm<=usableW2 && logoHmm<=usableH2){
       var lx2=MG+(usableW2-logoWmm)/2, ly2=p2Y+(usableH2-logoHmm)/2;
-      CV.getObjects().forEach(function(o){
-        if(o.id!=='logo'&&o.id!=='logo-copy') return;
+
+      // Intentar SVG vectorial primero
+      var svgAddedP2 = false;
+      if(LOGO && typeof svg2pdf !== 'undefined' && svg2pdf.svg2pdf){
         try{
-          var logoPNG=o.toDataURL({format:'png',multiplier:3});
-          pdf.addImage(logoPNG,'PNG',lx2,ly2,logoWmm,logoHmm);
-          lx2+=logoWmm+8;
-          if(lx2+logoWmm>MG+usableW2){lx2=MG;ly2+=logoHmm+8;}
-        }catch(e){console.warn('logo p2:',e);}
-      });
+          var svgStr2 = LOGO.toSVG();
+          var tmpDiv2 = document.createElement('div');
+          tmpDiv2.style.cssText = 'position:absolute;left:-9999px;top:-9999px;';
+          tmpDiv2.innerHTML = svgStr2;
+          document.body.appendChild(tmpDiv2);
+          var svgNode2 = tmpDiv2.querySelector('svg');
+          if(svgNode2){
+            await svg2pdf.svg2pdf(svgNode2, pdf, {x:lx2, y:ly2, width:logoWmm, height:logoHmm});
+            svgAddedP2 = true;
+          }
+          document.body.removeChild(tmpDiv2);
+        } catch(e){ console.warn('svg2pdf p2:', e); }
+      }
+
+      // Fallback PNG alta resolución
+      if(!svgAddedP2){
+        CV.getObjects().forEach(function(o){
+          if(o.id!=='logo'&&o.id!=='logo-copy') return;
+          try{
+            var logoPNG=o.toDataURL({format:'png',multiplier:6});
+            pdf.addImage(logoPNG,'PNG',lx2,ly2,logoWmm,logoHmm);
+            lx2+=logoWmm+8;
+            if(lx2+logoWmm>MG+usableW2){lx2=MG;ly2+=logoHmm+8;}
+          }catch(e){console.warn('logo p2 png:',e);}
+        });
+      }
+
       if(document.getElementById('trul').checked){
         pdfRuler(pdf,MG,p2Y,usableW2/10,'h');
         pdfRuler(pdf,MG,p2Y,usableH2/10,'v');
